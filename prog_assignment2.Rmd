@@ -1,0 +1,116 @@
+---
+title: "course5progassignment2_PNM"
+author: "PNM"
+date: "January 11, 2018"
+output: html_document
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(utils)
+library(RCurl)
+```
+
+# Course 5 - Programming Assignment 1 
+
+## Read the data 
+
+```{r}
+setwd("C:\\Users\\mehtap\\Documents\\Coursera\\Course5")
+filename <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+
+if (url.exists(filename)) {
+  download.file(filename,"stormdata.csv.bz2")
+  
+}
+
+# unzip the file
+unzip("stormdata.csv.bz2", exdir = "C:\\Users\\mehtap\\Documents\\Coursera\\Course5")
+setwd("C:\\Users\\mehtap\\Documents\\Coursera\\Course5")
+
+# Now read the CSV file and create the data frame
+
+rawdata <- read.csv("stormdata.bz2",na.strings = "NA")
+```
+
+## What is mean total number of steps taken per day?
+```{r}
+tempdata <- rawdata %>% 
+  group_by(date) %>%
+  summarise(sumsteps = sum(steps,na.rm = TRUE))
+ggplot(tempdata) +geom_histogram(mapping = aes(x = sumsteps), na.rm = TRUE)
+
+tempsub1 <- tempdata  %>% summarise(meansteps = mean(sumsteps , na.rm = T), mediansteps = median(sumsteps, na.rm = TRUE))
+
+```
+
+The mean steps are `r tempsub1$meansteps` and median steps are `r tempsub1$mediansteps`.
+
+
+## What is the average daily activity pattern?
+
+```{r}
+tempdata2 <- rawdata %>% group_by(as.factor(interval)) %>% summarise(avgsteps = mean(steps, na.rm = TRUE))
+
+plot(x = tempdata2$`as.factor(interval)`, y= tempdata2$avgsteps, type = "l",
+     main = "Average Steps taken by time interval",
+     xlab = "Interval",
+     ylab = "Step Count")
+# find the location of the maximum point
+maxindex <- which( tempdata2$avgsteps == max(tempdata2$avgsteps))
+
+# this is the interval when the max steps are recorded, averaged across all days 
+tempdata2$`as.factor(interval)`[maxindex]
+```
+
+## Imputing missing values 
+
+```{r}
+# Calculate and report the total number of missing values
+TotalMissingValues <- sum(is.na(rawdata))
+# Fill in the missing values 
+# look up the interval of the missing value and fill in the mean from tempdata2
+newdata <- rawdata
+for (i in 1:nrow(newdata)) {
+  if (is.na(newdata$steps[i])) {
+    intval <- newdata$interval[i]
+    fillinval <- tempdata2[as.factor(intval),2]
+    newdata$steps[i] <- as.numeric(fillinval)
+    
+  }
+}
+
+# now create the histogram of the total steps taken per day 
+tempdata3 <- newdata %>% 
+  group_by(date) %>%
+  summarise(sumsteps = sum(steps))
+ggplot(tempdata3) +geom_histogram(mapping = aes(x = sumsteps))
+
+# report out the mean and median values of the total steps 
+tempsub2 <-tempdata3  %>% summarise(meansteps = mean(sumsteps), mediansteps = median(sumsteps))
+
+
+```
+
+The mean steps are `r tempsub2$meansteps` and median steps are `r tempsub2$mediansteps`.
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+# create a factor variable indicating if the date is a weekday or weekend 
+weekdayvec <- weekdays(as.Date(newdata$date), abbr = TRUE)
+
+newdata$weekend <- ifelse(weekdays(as.Date(newdata$date),abbreviate = TRUE) %in% c("Sat", "Sun"), "weekend", "weekday")
+
+# now make a panel plot
+
+tempdata4 <- newdata %>% group_by(Interval = as.factor(interval), Weekend = as.factor(weekend)) %>% summarise(avgsteps = mean(steps, na.rm = TRUE))
+
+tempdata5 <- tempdata4 %>% filter( Weekend == "weekday")
+tempdata6 <- tempdata4 %>% filter(Weekend == "weekend")
+par(mfrow = c(2,1))
+plot(tempdata5$Interval, tempdata5$avgsteps, type = "l", main = "Weekday")
+plot(tempdata6$Interval, tempdata6$avgsteps, type = "l", main = "Weekend")
+```
